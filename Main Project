@@ -1,1 +1,56 @@
+//include header files
+#include "Controller.h"
 
+
+//define static and constant variables
+
+
+int main(void)
+{
+  //initialise
+  adc_init();             //For joystick and sensor values
+  serial0_init();         //For serial monitor communications
+  serial2_init();         //For "external" communication
+  milliseconds_init();    //For communication pauses
+  _delay_ms(100);
+
+  //define variables
+
+  //Joystick 1: 2x DC Motor Controller:
+  uint8_t driveJoystickVerPin = x;
+  uint16_t driveJoystickVerADC = 0;           //Initial reading (0 - 1023)
+  uint8_t driveJoystickVerADCtoSend = 0;      //Converted for sending (0-253)
+  uint8_t driveJoystickVerADCtoRead = 0;      //Recieved value (0-253)
+  
+  uint8_t driveJoystickHorPin = x;           
+  uint16_t driveJoystickHorADC = 0;           //Initial reading (0-1023)
+  uint8_t driveJoystickHorADCtoSend = 0;      //Converted for sending (0-253)
+  uint8_t driveJoystickHorADCtoRead = 0;      //Recieved value (0-253)
+
+  //Joystick 2: Servo Controller
+  uint8_t servoJoystickHorPin = x;
+  uint16_t servoJoystickHorADC = 0;           //Initial reading (0-1023)
+  uint8_t servoJoystickHorADCtoSend = 0;      //Converted for sending (0-253)
+  uint8_t servoJoystickHorADCtoRead = 0;      //Recieved value (0-253)
+
+  //Serial Communication:
+  uint8_t serialByteIn = 0;         //byte to be read by the serial
+  uint8_t serialFSMstate = 0;       //Changes which state the current serial reading is in
+
+  //Motor 1: Left Hand Motor
+  uint16_t leftMotorInhibitor = OCR;        //Speed of the motor (0-TOP)
+  uint8_t leftMotorDirControlA = x;         //Direction control Pin 2
+  uint8_t leftMotorDirControlB = x;         //Direction control Pin 7
+
+  //Motor 2: Right Hand Motor
+  uint16_t rightMotorInhibitor = OCR;       //Speed of motor (0-TOP)
+  uint8_t rightMotorControlA = x;           //Direction control Pin 15
+  uint8_t rightMotorControlB = x;           //Direction Control Pin 9
+  
+  while(1)
+  {
+
+    
+  }
+  return(1);
+}

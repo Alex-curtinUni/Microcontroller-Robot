@@ -1,8 +1,21 @@
 //include header files
 #include "Controller.h"
+#include "avr/interrupt.h"
+#include <stdlib.h>
 
+ISR(INT0_vect) // executed when the interrupt is triggered
+{
+  //Code to be executed:
+  if (autoModeOn)
+  {
+    
+  }
+
+  else if (autoModeOn == FALSE);
+}
 
 //define static and constant variables
+
 
 
 int main(void)
@@ -16,10 +29,13 @@ int main(void)
 
   //define variables
 
+  //Interrupt Variables:
+  bool autoModeOn = false;
+  
   //Joystick 1: 2x DC Motor Controller:
   uint8_t driveJoystickVerPin = x;
   uint16_t driveJoystickVerADC = 0;           //Initial reading (0 - 1023)
-  uint8_t driveJoystickVerADCtoSend = 0;      //Converted for sending (0-253)
+  uint8_t  driveJoystickVerADCtoSend = 0;      //Converted for sending (0-253)
   uint8_t driveJoystickVerADCtoRead = 0;      //Recieved value (0-253)
   
   uint8_t driveJoystickHorPin = x;           
@@ -35,22 +51,167 @@ int main(void)
 
   //Serial Communication:
   uint8_t serialByteIn = 0;         //byte to be read by the serial
-  uint8_t serialFSMstate = 0;       //Changes which state the current serial reading is in
+  uint8_t serialFSMstate = 0;       //Changes which state the current serial reading is in github
+  uint8_t sendDataByte1 = 0;        //Motor Joystick Horizontal
+  uint8_t sendDataByte2 = 0;        //Motor Joystick Vertical
+  uint8_t sendDataByte3 = 0;        //Servo Joystick Horizontal
+  uint32_t currentMilli = 0;
+  uint32_t lastSendMilli = 0;
+  uint8_t recvDataByte1 = 0;        //Motor Joystick Horizontal
+  uint8_t recvDataByte2 = 0;        //Motor Joystick Vertical
+  uint8_t recvDataByte3 = 0;        //Servo Joystick Horizontal
+  bool messageRecieved;
+  UCSR2B |= (1 << RXCIE2);          // Enable the USART Receive Complete interrupt (USART_RXC)
+
 
   //Motor 1: Left Hand Motor
+  uint8_t leftMotorReading = 0;
   uint16_t leftMotorInhibitor = OCR;        //Speed of the motor (0-TOP)
   uint8_t leftMotorDirControlA = x;         //Direction control Pin 2
   uint8_t leftMotorDirControlB = x;         //Direction control Pin 7
 
   //Motor 2: Right Hand Motor
+  uint8_t rightMotorReading = 0;
   uint16_t rightMotorInhibitor = OCR;       //Speed of motor (0-TOP)
   uint8_t rightMotorControlA = x;           //Direction control Pin 15
   uint8_t rightMotorControlB = x;           //Direction Control Pin 9
+
+  //Servo Motor
+  uint16_t ServoPosition = x;
+  uint16_t ServoOCROuput = OCR
+
+  //initialise Timer5
+  noInterrupts();
+  TCCR5A = 0;
+  TCCR5B = 0;
+  TCCR5A |= (1<<COM1A1);    //Non Inverted Activate OCR1A
+  TCCR5A |= (1<<COM1B1);    //Non Inverted Activate OCR1B
+  TCCR5B |= (1<<WGM13);     //Mode 8, PWM Phase and Frequency Correct
+  TCCR5B |= (1<<CS10);      //Prescalar = 1
+  ICR5 = X;             //Top Value
+  OCR5A = 0;                //Count for PWM of Fan Motor
+  OCR5B = 0;                //Count for PWM of Heavy Motor
+  OCR5C = 0;                //Count for Servo Motor
+  interrupts();
+
+
   
   while(1)
   {
+    currentMilli = milliseconds;
 
-    
+    //sending section:
+    {
+      if(currentMilli - lastSendMilli >= 100)   //Sending rate controlled to 10Hz
+      {
+        driveJoystickVerADC = adc_read(driveJoystickVerPin);
+        driveJoystickVerADCtoSend = (uint8_t)((driveJoystickVerADC / 1023.0) * 253);
+
+        driveJoystickHorADC = adc_read(driveJoystickHorPin);
+        driveJoystickHorADCtoSend = (uint8_t)((driveJoystickHorADC / 1023.0) * 253);
+
+        servoJoystickHorADC = adc_read(servoJoystickHorPin);
+        servoJoystickHorADCtoSend = (uint8_t)((servoJoystickHorADC / 1023.0) * 253);
+        
+        sendDataByte1 = driveJoystickHorADCtoSend;
+        sendDataByte2 = driveJoystickVerADCtoSend;
+        sendDataByte3 = servoJoystickHorADCtoSend;
+        if (sendDataByte1>253)
+        sendDataByte1 = 253;
+        if (sendDataByte2>253)
+        sendDataByte2 = 253;
+        if (sendDataByte3>253)
+        sendDataByte3 = 253;
+
+        lastSendMilli = currentMilli;
+        serial2_write_byte(0xFF);         //send start byte 255
+        serial2_write_byte(sendDataByte1);   //send first data byte: must be scaled to the range 0-253
+        serial2_write_byte(sendDataByte2);  //send second parameter: must be scaled to the range 0-253
+        serial2_write_byte(sendDataByte3);  //send first data byte: must be scaled to the range 0-253
+        serial2_write_byte(0xFE);     //send stop byte = 254
+      }
+    }
+
+      //recieving section
+      
+      if(UCSR2A&(1<<RXC2)) //if new serial byte has arrived: refer to page 238 of datasheet. Single bit flag indicates a new byte is available
+      {
+        serialByteIn = UDR2;      //Move serial byte into the newest variable
+
+        switch(serialFSMstate)
+        {
+          case 0:
+          //do nothing, the start byte
+          break;
+
+          case 1:
+          //first parameter (motor joystick horizontal)
+          recvDataByte1 = serialByteIn;
+          serialFSMstate++;
+          break;
+
+          case 2:
+          recvDataByte2 = serialByteIn;
+          serialFSMstate++;
+          break;
+
+          case 3:
+          recvDataByte3 = serialByteIn;
+          serialFSMstate++;
+          break;
+
+          case 4:
+          //waiting for stop byte
+          if (serialByteIn = 0xFE)
+          {
+            //Update all values of this shit: (will do later)
+            driveJoystickHorADCtoRead = recvDataByte1;
+            driveJoystickVerADCtoRead = recvDataByte2;
+            servoJoystickHorADCtoRead = recvDataByte3;
+
+            leftMotorReading = driveJoystickVerADCtoRead + driveJoystickHorADCtoRead -253;
+            rightMotorReading = driveJoystickVerADCtoRead - driveJoystickHorADCtoRead;
+
+            leftMotorInhibitor = (uint32_t)abs(leftMotorReading)) / 126.0 * 2000;
+            rightMotorInhibitor = (uint32_t)abs(rightMotorReading)) / 126.0 * 2000;
+
+            OCR1A = leftMotorInhibitor;
+            OCR1B = rightMotorInhibitor;
+            
+            if(leftMotorReading >= 0)
+            {
+                PORTA |= (1<<PA1);
+                PORTA &= ~(1<<PA0);
+            }
+            else
+            {
+                PORTA |= (1<<PA0);
+                PORTA &= ~(1<<PA1);
+            }
+        
+            if(rightMotorReading >= 0)
+            {
+                PORTA |= (1<<PA3);
+                PORTA &= ~(1<<PA2);
+            }
+            else
+            {
+                PORTA |= (1<<PA2);
+                PORTA &= ~(1<<PA3);
+            }
+
+          }
+          //if stop byte isnt recieved, there is an error, do not update
+          serialFSMstate = 0;
+          break;
+        }
+        
+        if(serialByteIn == 0xFF) //if start byte is received, we go back to expecting the first data byte
+        {
+          serialFSMstate=1;
+        }
+
+      }
   }
   return(1);
 }
